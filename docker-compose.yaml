@@ -88,7 +88,6 @@ services:
     volumes:
       - emqx-data:/opt/emqx/data
       - emqx-log:/opt/emqx/log
-      - emqx-etc:/opt/emqx/etc
       - ./certs/server.pem:/opt/emqx/etc/certs/emqx.pem:ro
       - ./certs/server.key:/opt/emqx/etc/certs/emqx.key:ro
       - ./certs/ca.pem:/opt/emqx/etc/certs/ca.pem:ro
