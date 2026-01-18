@@ -45,5 +45,7 @@ openssl x509 -req -in esp32_client.csr -CA ca.pem -CAkey ca.key -CAcreateserial 
 
 rm -f server.csr esp32_client.csr server_san.cnf ca.srl
 
+chmod 644 "$CERT_DIR"/*
+
 echo "✅ Certificates generated in $CERT_DIR:"
 ls -la "$CERT_DIR"
