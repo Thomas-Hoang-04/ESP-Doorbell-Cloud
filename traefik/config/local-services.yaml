@@ -1,0 +1,97 @@
+http:
+  serversTransports:
+    streaming-transport:
+      forwardingTimeouts:
+        dialTimeout: 30s
+        responseHeaderTimeout: 0s
+        idleConnTimeout: 0s
+
+  routers:
+    doorbell-http:
+      rule: "Host(`doorbell-thomas.site`)"
+      service: noop-service
+      entryPoints: ["web"]
+      middlewares: ["redirect-to-https"]
+
+    doorbell-https:
+      rule: "Host(`doorbell-thomas.site`)"
+      service: doorbell-backend
+      entryPoints: ["websecure"]
+      middlewares: ["secure-headers", "rate-limit"]
+      tls:
+        certResolver: letsencrypt
+
+    emqx-http:
+      rule: "Host(`mqtt.doorbell-thomas.site`)"
+      service: noop-service
+      entryPoints: ["web"]
+      middlewares: ["redirect-to-https"]
+
+    emqx-https:
+      rule: "Host(`mqtt.doorbell-thomas.site`)"
+      service: emqx-dashboard
+      entryPoints: ["websecure"]
+      middlewares: ["secure-headers"]
+      tls:
+        certResolver: letsencrypt
+
+    traefik-dashboard-http:
+      rule: "Host(`traefik.doorbell-thomas.site`)"
+      service: noop-service
+      entryPoints: ["web"]
+      middlewares: ["redirect-to-https"]
+
+    traefik-dashboard:
+      rule: "Host(`traefik.doorbell-thomas.site`)"
+      service: api@internal
+      entryPoints: ["websecure"]
+      middlewares: ["secure-headers", "auth-dashboard"]
+      tls:
+        certResolver: letsencrypt
+
+  services:
+    doorbell-backend:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:8080"
+        passHostHeader: true
+        serversTransport: streaming-transport
+
+    emqx-dashboard:
+      loadBalancer:
+        servers:
+          - url: "http://emqx:18083"
+        passHostHeader: true
+
+    noop-service:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1"
+
+  middlewares:
+    redirect-to-https:
+      redirectScheme:
+        scheme: "https"
+        permanent: true
+
+    secure-headers:
+      headers:
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        frameDeny: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+
+    rate-limit:
+      rateLimit:
+        average: 100
+        burst: 200
+        period: 1s
+
+    auth-dashboard:
+      basicAuth:
+        users:
+          - "admin:$2b$12$VTWOn3qhNJ0ZHxgh7JFpHe2N8kUFCsUhK8yK3wHA8mstXQhkAsHJ6"

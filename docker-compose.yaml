@@ -1,0 +1,201 @@
+services:
+  traefik:
+    image: traefik:latest
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+
+      - "--entrypoints.web.address=:80"
+      - "--entryPoints.web.transport.respondingTimeouts.idleTimeout=180s"
+      - "--entrypoints.websecure.address=:443"
+      - "--entryPoints.websecure.transport.respondingTimeouts.idleTimeout=180s"
+
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=thomasdrive04@gmail.com"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme/acme.json"
+
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+
+      - "--log.level=INFO"
+
+      - "--accesslog=true"
+      - "--accesslog.format=json"
+      - "--accesslog.fields.headers.names.Authorization=redact"
+      - "--accesslog.addinternals=true"
+
+    ports:
+      - "80:80"
+      - "443:443"
+
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./traefik/config:/etc/traefik/dynamic
+      - ./traefik/acme:/etc/traefik/acme
+
+    networks:
+      - doorbell-net
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  emqx:
+    image: emqx/emqx:latest
+    container_name: emqx
+    hostname: ${EMQX_HOSTNAME:-mqtt-broker}
+    restart: unless-stopped
+
+    environment:
+      EMQX_NODE__NAME: emqx@${EMQX_HOSTNAME:-mqtt-broker}
+      EMQX_NODE__COOKIE: ${EMQX_NODE_COOKIE:-emqx_secret_cookie}
+
+      EMQX_DASHBOARD__DEFAULT_USERNAME: ${EMQX_DASHBOARD_USER:-admin}
+      EMQX_DASHBOARD__DEFAULT_PASSWORD: ${EMQX_DASHBOARD_PASSWORD}
+
+      EMQX_ALLOW_ANONYMOUS: "false"
+
+      EMQX_AUTH__USER__1__USERNAME: ${MQTT_BROKER_USERNAME}
+      EMQX_AUTH__USER__1__PASSWORD: ${MQTT_BROKER_PASSWORD}
+
+      EMQX_LISTENERS__TCP__DEFAULT__BIND: "0.0.0.0:1883"
+      EMQX_LISTENERS__TCP__DEFAULT__MAX_CONNECTIONS: 1024
+
+      EMQX_LISTENERS__SSL__DEFAULT__BIND: "0.0.0.0:8883"
+      EMQX_LISTENERS__SSL__DEFAULT__MAX_CONNECTIONS: 1024
+      EMQX_LISTENERS__SSL__DEFAULT__SSL_OPTIONS__CERTFILE: /opt/emqx/certs/emqx.pem
+      EMQX_LISTENERS__SSL__DEFAULT__SSL_OPTIONS__KEYFILE: /opt/emqx/certs/emqx.key
+      EMQX_LISTENERS__SSL__DEFAULT__SSL_OPTIONS__CACERTFILE: /opt/emqx/certs/ca.pem
+
+      EMQX_LOG__CONSOLE__LEVEL: ${EMQX_LOG_LEVEL:-warning}
+      EMQX_LOG__FILE__LEVEL: info
+
+      EMQX_MQTT__MAX_PACKET_SIZE: 16MB
+      EMQX_MQTT__MAX_CLIENTID_LEN: 65535
+      EMQX_MQTT__MAX_TOPIC_LEVELS: 128
+      EMQX_MQTT__SESSION_EXPIRY_INTERVAL: 120s
+
+      EMQX_MQTT__MAX_QOS_ALLOWED: 2
+      EMQX_MQTT__RETAIN_AVAILABLE: "true"
+
+    ports:
+      - "${EMQX_MQTT_PORT:-1883}:1883"
+      - "${EMQX_MQTTS_PORT:-8883}:8883"
+
+    volumes:
+      - emqx-data:/opt/emqx/data
+      - emqx-log:/opt/emqx/log
+      - emqx-etc:/opt/emqx/etc
+      - ./emqx/certs/emqx.pem:/opt/emqx/certs/emqx.pem:ro
+      - ./emqx/certs/emqx.key:/opt/emqx/certs/emqx.key:ro
+      - ./emqx/certs/ca.pem:/opt/emqx/certs/ca.pem:ro
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:18083/status || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    depends_on:
+      traefik:
+        condition: service_started
+
+    networks:
+      - doorbell-net
+
+  postgres:
+    image: postgres:17.6-bookworm
+    container_name: postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: doorbell
+      PGDATA: /var/lib/postgresql/data/pgdata
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./schema:/docker-entrypoint-initdb.d
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    networks:
+      - doorbell-net
+
+  backend:
+    image: ghcr.io/thomas-hoang-04/esp-doorbell-be:latest
+    pull_policy: always
+    container_name: doorbell-backend
+    restart: unless-stopped
+
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      SPRING_R2DBC_URL: r2dbc:postgresql://postgres:5432/doorbell
+      SPRING_R2DBC_USERNAME: ${POSTGRES_USER}
+      SPRING_R2DBC_PASSWORD: ${POSTGRES_PASSWORD}
+      MQTT_BROKER_URL: ssl://emqx
+      MQTT_BROKER_PORT: 8883
+      MQTT_BROKER_USERNAME: ${MQTT_BROKER_USERNAME}
+      MQTT_BROKER_PASSWORD: ${MQTT_BROKER_PASSWORD}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      FIREBASE_CREDENTIALS_PATH: /app/config/firebase-spring.json
+      MQTT_CA_PATH: /app/certs/ca.pem
+      APP_STORAGE_UPLOAD_DIR: /app/uploads
+      APP_API_BASE_URL: https://doorbell-thomas.site
+      STREAMING_UDP_PORT: 8443
+      STREAMING_DTLS_CERT_PATH: /app/certs/dtls-server.pem
+      STREAMING_DTLS_KEY_PATH: /app/certs/dtls-server.key
+
+    volumes:
+      - ./firebase/firebase-spring.json:/app/config/firebase-spring.json:ro
+      - ./emqx/certs/ca.pem:/app/certs/ca.pem:ro
+      - ./emqx/certs/emqx.pem:/app/certs/dtls-server.pem:ro
+      - ./emqx/certs/emqx.key:/app/certs/dtls-server.key:ro
+      - ./uploads:/app/uploads
+
+    ports:
+      - "8080:8080"
+      - "8443:8443/udp"
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+    depends_on:
+      traefik:
+        condition: service_started
+      emqx:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+    networks:
+      - doorbell-net
+
+volumes:
+  emqx-data:
+    name: emqx-data
+  emqx-log:
+    name: emqx-log
+  emqx-etc:
+    name: emqx-etc
+  postgres-data:
+    name: postgres-data
+
+networks:
+  doorbell-net:
+    name: doorbell-net

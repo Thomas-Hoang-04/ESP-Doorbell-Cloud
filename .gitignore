@@ -1,0 +1,5 @@
+/emqx/certs
+/uploads
+/firebase
+.env
+/traefik/acme
