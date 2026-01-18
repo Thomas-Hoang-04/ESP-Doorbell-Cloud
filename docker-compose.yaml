@@ -66,9 +66,9 @@ services:
 
       EMQX_LISTENERS__SSL__DEFAULT__BIND: "0.0.0.0:8883"
       EMQX_LISTENERS__SSL__DEFAULT__MAX_CONNECTIONS: 1024
-      EMQX_LISTENERS__SSL__DEFAULT__SSL_OPTIONS__CERTFILE: /opt/emqx/certs/emqx.pem
-      EMQX_LISTENERS__SSL__DEFAULT__SSL_OPTIONS__KEYFILE: /opt/emqx/certs/emqx.key
-      EMQX_LISTENERS__SSL__DEFAULT__SSL_OPTIONS__CACERTFILE: /opt/emqx/certs/ca.pem
+      EMQX_LISTENERS__SSL__DEFAULT__SSL_OPTIONS__CERTFILE: /opt/emqx/etc/certs/emqx.pem
+      EMQX_LISTENERS__SSL__DEFAULT__SSL_OPTIONS__KEYFILE: /opt/emqx/etc/certs/emqx.key
+      EMQX_LISTENERS__SSL__DEFAULT__SSL_OPTIONS__CACERTFILE: /opt/emqx/etc/certs/ca.pem
 
       EMQX_LOG__CONSOLE__LEVEL: ${EMQX_LOG_LEVEL:-warning}
       EMQX_LOG__FILE__LEVEL: info
@@ -89,9 +89,9 @@ services:
       - emqx-data:/opt/emqx/data
       - emqx-log:/opt/emqx/log
       - emqx-etc:/opt/emqx/etc
-      - ./certs/server.pem:/opt/emqx/certs/emqx.pem:ro
-      - ./certs/server.key:/opt/emqx/certs/emqx.key:ro
-      - ./certs/ca.pem:/opt/emqx/certs/ca.pem:ro
+      - ./certs/server.pem:/opt/emqx/etc/certs/emqx.pem:ro
+      - ./certs/server.key:/opt/emqx/etc/certs/emqx.key:ro
+      - ./certs/ca.pem:/opt/emqx/etc/certs/ca.pem:ro
 
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:18083/status || exit 1"]
