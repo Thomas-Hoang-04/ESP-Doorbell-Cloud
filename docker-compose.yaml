@@ -44,7 +44,7 @@ services:
       - "host.docker.internal:host-gateway"
 
   emqx:
-    image: emqx/emqx:5.8.9
+    image: emqx/emqx:5.8
     container_name: emqx
     hostname: ${EMQX_HOSTNAME:-mqtt-broker}
     restart: unless-stopped
