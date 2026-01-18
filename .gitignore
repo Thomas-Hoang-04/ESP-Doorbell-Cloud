@@ -3,3 +3,4 @@
 /firebase
 .env
 /traefik/acme
+/certs

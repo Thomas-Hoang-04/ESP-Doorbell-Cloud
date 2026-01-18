@@ -89,9 +89,9 @@ services:
       - emqx-data:/opt/emqx/data
       - emqx-log:/opt/emqx/log
       - emqx-etc:/opt/emqx/etc
-      - ./emqx/certs/emqx.pem:/opt/emqx/certs/emqx.pem:ro
-      - ./emqx/certs/emqx.key:/opt/emqx/certs/emqx.key:ro
-      - ./emqx/certs/ca.pem:/opt/emqx/certs/ca.pem:ro
+      - ./certs/server.pem:/opt/emqx/certs/emqx.pem:ro
+      - ./certs/server.key:/opt/emqx/certs/emqx.key:ro
+      - ./certs/ca.pem:/opt/emqx/certs/ca.pem:ro
 
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:18083/status || exit 1"]
@@ -159,9 +159,9 @@ services:
 
     volumes:
       - ./firebase/firebase-spring.json:/app/config/firebase-spring.json:ro
-      - ./emqx/certs/ca.pem:/app/certs/ca.pem:ro
-      - ./emqx/certs/emqx.pem:/app/certs/dtls-server.pem:ro
-      - ./emqx/certs/emqx.key:/app/certs/dtls-server.key:ro
+      - ./certs/ca.pem:/app/certs/ca.pem:ro
+      - ./certs/server.pem:/app/certs/dtls-server.pem:ro
+      - ./certs/server.key:/app/certs/dtls-server.key:ro
       - ./uploads:/app/uploads
 
     ports:
