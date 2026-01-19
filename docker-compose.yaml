@@ -136,7 +136,7 @@ services:
   backend:
     image: ghcr.io/thomas-hoang-04/esp-doorbell-be:latest
     pull_policy: always
-    container_name: doorbell-backend
+    container_name: doorbell
     restart: unless-stopped
 
     environment:
