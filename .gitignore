@@ -4,3 +4,4 @@
 .env
 /traefik/acme
 /certs
+/coturn

@@ -153,20 +153,18 @@ services:
       MQTT_CA_PATH: /app/certs/ca.pem
       APP_STORAGE_UPLOAD_DIR: /app/uploads
       APP_API_BASE_URL: https://doorbell-thomas.site
-      STREAMING_UDP_PORT: 8443
-      STREAMING_DTLS_CERT_PATH: /app/certs/dtls-server.pem
-      STREAMING_DTLS_KEY_PATH: /app/certs/dtls-server.key
-
+      TURN_SERVER_HOST: ${TURN_SERVER_HOST}
+      TURN_SERVER_PORT: ${TURN_SERVER_PORT}
+      TURN_USERNAME: ${TURN_USERNAME}
+      TURN_PASSWORD: ${TURN_PASSWORD}
+    
     volumes:
       - ./firebase/firebase-spring.json:/app/config/firebase-spring.json:ro
       - ./certs/ca.pem:/app/certs/ca.pem:ro
-      - ./certs/server.pem:/app/certs/dtls-server.pem:ro
-      - ./certs/server.key:/app/certs/dtls-server.key:ro
       - ./uploads:/app/uploads
 
     ports:
       - "8080:8080"
-      - "8443:8443/udp"
 
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1"]
@@ -185,6 +183,22 @@ services:
 
     networks:
       - doorbell-net
+
+  coturn:
+    image: coturn/coturn:latest
+    container_name: coturn
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - -c
+      - /etc/coturn/turnserver.conf
+      - --external-ip=${TURN_EXTERNAL_IP}
+      - --user=${TURN_USERNAME}:${TURN_PASSWORD}
+    volumes:
+      - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+      - ./certs/server.pem:/etc/coturn/cert.pem:ro
+      - ./certs/server.key:/etc/coturn/key.pem:ro
+
 
 volumes:
   emqx-data:
